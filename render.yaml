@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: hb-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python api.py
+    envVars:
+      - key: HB_BROKER
+        value: 0
+      - key: HB_DNI
+        sync: false
+      - key: HB_USER
+        sync: false
+      - key: HB_PASSWORD
+        sync: false
+      - key: HB_OPTIONS_PREFIXES
+        value: GFG,GAL
+      - key: HB_STOCK_PREFIXES
+        value: GGAL,YPFD,PAMP
+      - key: HB_TICKERS_FILE
+        value: tickers.json
+      - key: HB_RECONNECT_INTERVAL
+        value: 30
+      - key: HB_MAX_RECONNECT_ATTEMPTS
+        value: 5
+      - key: HB_HEALTH_CHECK_INTERVAL
+        value: 60

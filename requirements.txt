@@ -1,0 +1,10 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.3
+python-dotenv==1.0.1
+git+https://github.com/crapher/pyhomebroker.git
+xlwings==0.30.12
+pandas==2.2.2
+python-dateutil==2.9.0.post0
+numpy==2.0.1
+requests==2.31.0
+

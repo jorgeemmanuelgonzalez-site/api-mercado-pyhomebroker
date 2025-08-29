@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  hb-api:
+    build: .
+    container_name: hb-api
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    environment:
+      - HB_BROKER=${HB_BROKER:-0}
+      - HB_DNI=${HB_DNI}
+      - HB_USER=${HB_USER}
+      - HB_PASSWORD=${HB_PASSWORD}
+      - HB_OPTIONS_PREFIXES=${HB_OPTIONS_PREFIXES:-GFG}
+      - HB_TICKERS_FILE=${HB_TICKERS_FILE:-tickers.json}
+      # API_TOKEN eliminado - API completamente pública
+      - HB_RECONNECT_INTERVAL=${HB_RECONNECT_INTERVAL:-30}
+      - HB_MAX_RECONNECT_ATTEMPTS=${HB_MAX_RECONNECT_ATTEMPTS:-5}
+      - HB_HEALTH_CHECK_INTERVAL=${HB_HEALTH_CHECK_INTERVAL:-60}
+    volumes:
+      - ./tickers.json:/app/tickers.json:ro
+      - ./logs:/app/logs
+    networks:
+      - hb-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 120s
+
+networks:
+  hb-network:
+    driver: bridge
+
+volumes:
+  logs:

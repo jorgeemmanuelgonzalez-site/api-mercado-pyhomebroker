@@ -1,0 +1,47 @@
+{
+    "options_prefixes": [
+        "GFG",
+        "YPF",
+        "PAMP",
+        "COM"
+    ],
+    "stock_prefixes": [
+        "GGAL",
+        "YPFD",
+        "PAMP",
+        "TECO2",
+        "ALUA",
+        "CRES"
+    ],
+    "acciones": [
+        "GGAL",
+        "YPFD",
+        "PAMP",
+        "TECO2",
+        "ALUA",
+        "CRES"
+    ],
+    "bonos": [
+        "AL30",
+        "GD30",
+        "GGAL",
+        "YPF"
+    ],
+    "cedears": [
+        "AAPL",
+        "TSLA",
+        "MSFT",
+        "GOOGL"
+    ],
+    "letras": [
+        "LELIQ"
+    ],
+    "ons": [
+        "ON"
+    ],
+    "panel_general": [
+        "ALUA",
+        "CRES",
+        "TECO2"
+    ]
+}
