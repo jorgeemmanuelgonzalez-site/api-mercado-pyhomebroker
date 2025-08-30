@@ -1,12 +1,11 @@
 # 🚀 HB API - API Pública de HomeBroker
 
-API REST completamente **PÚBLICA** para obtener datos en tiempo real y históricos de HomeBroker, incluyendo opciones, acciones, bonos, cedears y más.
+API REST completamente **PÚBLICA** para obtener datos en tiempo real de HomeBroker, incluyendo opciones, acciones, bonos, cedears y más.
 
 ## ✨ Características Principales
 
 - **🔓 API 100% PÚBLICA** - Sin autenticación requerida
 - **📊 Datos en tiempo real** de opciones, acciones y securities
-- **📈 Históricos completos** con soporte para intraday
 - **🐳 Despliegue fácil** en Render, VPS o local
 - **⚡ FastAPI** - Framework moderno y rápido
 - **🔄 Reconexión automática** y monitoreo de salud
@@ -47,6 +46,7 @@ HB_HEALTH_CHECK_INTERVAL=60
 Si prefieres control total sobre tu servidor, puedes usar un VPS con Docker.
 
 #### Requisitos del VPS:
+
 - **Sistema:** Ubuntu 20.04+ o similar
 - **RAM:** Mínimo 1GB (recomendado 2GB+)
 - **CPU:** 1 vCPU mínimo
@@ -55,11 +55,13 @@ Si prefieres control total sobre tu servidor, puedes usar un VPS con Docker.
 #### Instalación en VPS:
 
 1. **Conecta a tu VPS:**
+
 ```bash
 ssh usuario@tu-vps-ip
 ```
 
 2. **Instala Docker y Docker Compose:**
+
 ```bash
 # Actualizar sistema
 sudo apt update && sudo apt upgrade -y
@@ -81,12 +83,14 @@ exit
 ```
 
 3. **Clona el repositorio:**
+
 ```bash
 git clone https://github.com/tu-usuario/api-market-publico.git
 cd api-market-publico
 ```
 
 4. **Configura las variables de entorno:**
+
 ```bash
 cp env.example .env
 nano .env
@@ -94,16 +98,19 @@ nano .env
 ```
 
 5. **Levanta la aplicación:**
+
 ```bash
 docker-compose up -d
 ```
 
 6. **Verifica que esté funcionando:**
+
 ```bash
 curl http://localhost:8080/health
 ```
 
 7. **Configura firewall (opcional):**
+
 ```bash
 sudo ufw allow 8080
 ```
@@ -112,37 +119,40 @@ sudo ufw allow 8080
 
 ### 🔍 Endpoints Públicos (Sin Autenticación)
 
-| Endpoint | Descripción | Ejemplo |
-|----------|-------------|---------|
-| `/` | Información de la API | `GET /` |
-| `/health` | Estado de conexión | `GET /health` |
-| `/options` | Todas las opciones | `GET /options` |
-| `/stocks` | Todas las acciones | `GET /stocks` |
-| `/securities` | Todos los securities | `GET /securities` |
-| `/historical/{symbol}` | Histórico de un símbolo | `GET /historical/GGAL` |
-| `/intraday/{symbol}` | Datos del día actual | `GET /intraday/GGAL` |
-| `/config` | Configuración del sistema | `GET /config` |
+| Endpoint      | Descripción               | Ejemplo           |
+| ------------- | ------------------------- | ----------------- |
+| `/`           | Información de la API     | `GET /`           |
+| `/health`     | Estado de conexión        | `GET /health`     |
+| `/options`    | Todas las opciones        | `GET /options`    |
+| `/stocks`     | Todas las acciones        | `GET /stocks`     |
+| `/securities` | Todos los securities      | `GET /securities` |
+| `/cauciones`  | Datos de cauciones        | `GET /cauciones`  |
+| `/config`     | Configuración del sistema | `GET /config`     |
 
 ### 📊 Ejemplos de Uso
 
 #### Obtener todas las acciones:
+
 ```bash
 curl "https://tu-api.onrender.com/stocks"
 ```
 
-#### Obtener histórico de GGAL:
-```bash
-curl "https://tu-api.onrender.com/historical/GGAL?days=30"
-```
-
-#### Obtener datos intraday:
-```bash
-curl "https://tu-api.onrender.com/intraday/GGAL"
-```
-
 #### Obtener opciones por prefijo:
+
 ```bash
 curl "https://tu-api.onrender.com/options/prefix/GFG"
+```
+
+#### Obtener securities por ticker:
+
+```bash
+curl "https://tu-api.onrender.com/securities/ticker/GGAL"
+```
+
+#### Obtener estado de conexión:
+
+```bash
+curl "https://tu-api.onrender.com/health"
 ```
 
 ## ⚙️ Configuración
@@ -171,11 +181,11 @@ HB_HEALTH_CHECK_INTERVAL=60   # Intervalo de health check
 
 ```json
 {
-    "options_prefixes": ["GFG", "YPF", "PAMP"],
-    "stock_prefixes": ["GGAL", "YPFD", "PAMP"],
-    "acciones": ["GGAL", "YPFD", "PAMP"],
-    "bonos": ["AL30", "GD30"],
-    "cedears": ["AAPL", "TSLA", "MSFT"]
+  "options_prefixes": ["GFG", "YPF", "PAMP"],
+  "stock_prefixes": ["GGAL", "YPFD", "PAMP"],
+  "acciones": ["GGAL", "YPFD", "PAMP"],
+  "bonos": ["AL30", "GD30"],
+  "cedears": ["AAPL", "TSLA", "MSFT"]
 }
 ```
 
@@ -220,16 +230,19 @@ api-market-publico/
 ## 🔧 Solución de Problemas
 
 ### Error de Conexión
+
 - Verifica que las credenciales sean correctas
 - Asegúrate de que tu broker esté activo
 - Revisa el endpoint `/health` para el estado de conexión
 
 ### Error de Dependencias
+
 - Asegúrate de tener Python 3.8+
 - Reinstala las dependencias: `pip install -r requirements.txt`
 - Verifica que pyhomebroker esté instalado correctamente
 
 ### Error en Docker
+
 - Verifica que Docker esté ejecutándose
 - Revisa los logs: `docker-compose logs`
 - Reinicia el contenedor: `docker-compose restart`
@@ -238,7 +251,7 @@ api-market-publico/
 
 - **Documentación de la API:** `https://tu-api.onrender.com/docs`
 - **FastAPI:** [fastapi.tiangolo.com](https://fastapi.tiangolo.com)
-- **pyhomebroker:** [GitHub](https://github.com/crapher/pyhomebroker)
+- **pyhomebroker:** [PyPI](https://pypi.org/project/pyhomebroker/)
 - **Render:** [render.com](https://render.com)
 
 ## 🤝 Contribuciones

@@ -10,8 +10,6 @@ import pandas as pd
 from pyhomebroker import HomeBroker
 from dotenv import load_dotenv
 
-import Options_Helper_HM
-
 # Configurar logging estructurado
 logging.basicConfig(
     level=logging.INFO,
@@ -37,9 +35,8 @@ def _parse_prefixes_env(value: Optional[str]) -> List[str]:
 
 
 def _load_option_prefixes_from_config_file() -> List[str]:
-    # Usa el mismo archivo de configuración que Options_Helper_HM
-    from Options_Helper_HM import TICKERS_FILE  # lazy import
-    cfg = _read_json_if_exists(TICKERS_FILE) or {}
+    # Usa el archivo tickers.json
+    cfg = _read_json_if_exists("tickers.json") or {}
     prefixes = cfg.get("options_prefixes") or []
     if isinstance(prefixes, list):
         return [str(p) for p in prefixes if str(p).strip()]
@@ -56,9 +53,8 @@ def _load_option_prefixes_env_then_file() -> List[str]:
 
 
 def _load_stock_prefixes_from_config_file() -> List[str]:
-    # Usa el mismo archivo de configuración que Options_Helper_HM
-    from Options_Helper_HM import TICKERS_FILE  # lazy import
-    cfg = _read_json_if_exists(TICKERS_FILE) or {}
+    # Usa el archivo tickers.json
+    cfg = _read_json_if_exists("tickers.json") or {}
     prefixes = cfg.get("stock_prefixes") or []
     if isinstance(prefixes, list):
         return [str(p) for p in prefixes if str(p).strip()]
@@ -77,10 +73,9 @@ def _load_stock_prefixes_env_then_file() -> List[str]:
 class HBService:
     """Servicio que mantiene conexión a HomeBroker y expone snapshots en memoria.
 
-    - Inicializa los DataFrames a partir de los tickers definidos en Excel (solo lectura)
+    - Inicializa los DataFrames vacíos que se llenarán con datos en tiempo real
     - Actualiza `options`, `securities` (everything) y `cauciones` vía callbacks
     - Ofrece métodos thread-safe para leer los datos
-    - Incluye funcionalidades para históricos y precios de acciones
     """
 
     def __init__(self) -> None:
@@ -98,18 +93,10 @@ class HBService:
         self.max_reconnect_attempts = int(os.getenv("HB_MAX_RECONNECT_ATTEMPTS", "5"))
         self.health_check_interval = int(os.getenv("HB_HEALTH_CHECK_INTERVAL", "60"))  # segundos
 
-        # DataFrames en memoria
-        acc = Options_Helper_HM.getAccionesList()
-        bonos = Options_Helper_HM.getBonosList()
-        letras = Options_Helper_HM.getLetrasList()
-        ons = Options_Helper_HM.getONSList()
-        panel_general = Options_Helper_HM.getPanelGeneralList()
-        cedears = Options_Helper_HM.getCedearsList()
-        self.options = Options_Helper_HM.getOptionsList().rename(
-            columns={"bid_size": "bidsize", "ask_size": "asksize"}
-        )
-        self.everything = pd.concat([acc, bonos, letras, panel_general, ons, cedears])
-        self.cauciones = Options_Helper_HM.cauciones.copy()
+        # DataFrames vacíos que se llenarán con datos en tiempo real
+        self.options = pd.DataFrame()
+        self.everything = pd.DataFrame()
+        self.cauciones = pd.DataFrame()
 
         # Sincronización y estado de conexión
         self._lock = threading.RLock()
@@ -467,246 +454,6 @@ class HBService:
     def get_cauciones(self) -> pd.DataFrame:
         with self._lock:
             return self.cauciones.copy()
-
-    def test_simple_dates(self) -> Dict[str, Any]:
-        """
-        Método de prueba simple para verificar fechas básicas.
-        """
-        try:
-            # Crear fechas simples
-            now = datetime.now()
-            yesterday = now - timedelta(days=1)
-            
-            result = {
-                "now_type": type(now).__name__,
-                "yesterday_type": type(yesterday).__name__,
-                "now_str": now.strftime('%Y-%m-%d %H:%M:%S'),
-                "yesterday_str": yesterday.strftime('%Y-%m-%d %H:%M:%S'),
-                "difference_days": (now - yesterday).days
-            }
-            
-            logger.info(f"Prueba simple de fechas: {result}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error en prueba simple de fechas: {e}")
-            return {"error": str(e)}
-
-    def test_date_calculation(self, days: int = 30) -> Dict[str, Any]:
-        """
-        Método de prueba para verificar el cálculo de fechas.
-        Útil para debugging de problemas de tipos de fecha.
-        """
-        try:
-            # Usar datetime.now() directamente, no importar de nuevo
-            to_date = datetime.now()
-            from_date = to_date - timedelta(days=days)
-            
-            # Verificar tipos antes de hacer operaciones
-            if not isinstance(to_date, datetime) or not isinstance(from_date, datetime):
-                raise Exception(f"Tipos de fecha incorrectos: to_date={type(to_date)}, from_date={type(from_date)}")
-            
-            result = {
-                "to_date": to_date.isoformat(),
-                "to_date_type": type(to_date).__name__,
-                "from_date": from_date.isoformat(),
-                "from_date_type": type(from_date).__name__,
-                "days_difference": (to_date - from_date).days,
-                "from_date_str": from_date.strftime('%Y-%m-%d %H:%M:%S'),
-                "to_date_str": to_date.strftime('%Y-%m-%d %H:%M:%S')
-            }
-            
-            logger.info(f"Prueba de fechas: {result}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Error en prueba de fechas: {e}")
-            return {"error": str(e)}
-
-    def get_historical_data(self, symbol: str, days: int = 30, settlement: str = "24hs") -> pd.DataFrame:
-        """
-        Obtiene datos históricos de un símbolo específico.
-        
-        Args:
-            symbol: Símbolo del instrumento (ej: 'GGAL', 'GFG24JAN17.50C')
-            days: Número de días hacia atrás
-            settlement: Tipo de liquidación ('24hs', 'SPOT', '48hs', etc.)
-        """
-        try:
-            print(f"🔍 DEBUG: Iniciando get_historical_data para {symbol}")
-            
-            # Validar que el símbolo no sea una palabra reservada
-            reserved_words = ['batch', 'all', 'options', 'stocks', 'securities', 'historical', 'intraday']
-            if symbol.lower() in reserved_words:
-                raise Exception(f"'{symbol}' es una palabra reservada y no puede ser un símbolo válido")
-            
-            print(f"🔍 DEBUG: Símbolo validado: {symbol}")
-            
-            if not self._hb or not self._connected:
-                raise Exception("No hay conexión activa a HomeBroker")
-            
-            print(f"🔍 DEBUG: Conexión verificada: _hb={self._hb is not None}, connected={self._connected}")
-            
-            logger.info(f"Obteniendo histórico para {symbol} - {days} días - {settlement}")
-            
-            # Calcular fechas para get_daily_history
-            # Usar datetime.now() directamente, no importar de nuevo
-            to_date = datetime.now()
-            from_date = to_date - timedelta(days=days)
-            
-            print(f"🔍 DEBUG: Fechas calculadas - to_date: {to_date} ({type(to_date)}), from_date: {from_date} ({type(from_date)})")
-            
-            # Verificar tipos antes de hacer operaciones
-            if not isinstance(to_date, datetime) or not isinstance(from_date, datetime):
-                raise Exception(f"Tipos de fecha incorrectos: to_date={type(to_date)}, from_date={type(from_date)}")
-            
-            # CONVERTIR A DATE para evitar el error de pyhomebroker
-            from_date_date = from_date.date()
-            to_date_date = to_date.date()
-            
-            print(f"🔍 DEBUG: Fechas convertidas a date - from_date: {from_date_date} ({type(from_date_date)}), to_date: {to_date_date} ({type(to_date_date)})")
-            
-            logger.info(f"Fechas calculadas: desde {from_date_date.strftime('%Y-%m-%d')} hasta {to_date_date.strftime('%Y-%m-%d')}")
-            
-            print(f"🔍 DEBUG: Llamando a self._hb.history.get_daily_history...")
-            
-            # Usar el método correcto que existe en pyhomebroker
-            # get_daily_history requiere: symbol, from_date, to_date
-            # PASAR FECHAS COMO DATE, NO COMO DATETIME
-            df = self._hb.history.get_daily_history(symbol, from_date_date, to_date_date)
-            
-            print(f"🔍 DEBUG: Resultado de get_daily_history: {df is not None}, empty: {df.empty if df is not None else 'N/A'}")
-            
-            if df is not None and not df.empty:
-                # Limpiar y formatear datos
-                df = df.reset_index()
-                
-                # Asegurar que datetime existe y es válido
-                if 'datetime' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['datetime'])
-                    df = df.sort_values('datetime')
-                elif 'date' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['date'])
-                    df = df.sort_values('datetime')
-                
-                # Convertir porcentajes si existen
-                if 'change' in df.columns:
-                    df['change'] = df['change'] / 100
-                
-                logger.info(f"✅ Histórico procesado exitosamente para {symbol}: {len(df)} registros")
-                return df
-            else:
-                logger.warning(f"No se encontraron datos históricos para {symbol}")
-                return pd.DataFrame()
-                
-        except Exception as e:
-            print(f"❌ ERROR en get_historical_data: {e}")
-            print(f"❌ Tipo de error: {type(e)}")
-            import traceback
-            print(f"❌ Traceback: {traceback.format_exc()}")
-            logger.error(f"Error obteniendo histórico para {symbol}: {e}")
-            raise Exception(f"Error obteniendo histórico: {str(e)}")
-
-    def get_historical_data_batch(self, symbols: List[str], days: int = 30, settlement: str = "24hs") -> Dict[str, pd.DataFrame]:
-        """
-        Obtiene datos históricos de múltiples símbolos en lote.
-        
-        Args:
-            symbols: Lista de símbolos
-            days: Número de días hacia atrás
-            settlement: Tipo de liquidación para securities
-        """
-        results = {}
-        
-        for symbol in symbols:
-            try:
-                df = self.get_historical_data(symbol, days, settlement)
-                if not df.empty:
-                    results[symbol] = df
-            except Exception as e:
-                logger.error(f"Error obteniendo histórico para {symbol}: {e}")
-                results[symbol] = pd.DataFrame()  # DataFrame vacío en caso de error
-        
-        return results
-
-    def get_intraday_history(self, symbol: str) -> pd.DataFrame:
-        """
-        Obtiene datos históricos intraday (del día actual) de un símbolo específico.
-        
-        Args:
-            symbol: Símbolo del instrumento (ej: 'GFG24JAN17.50C', 'GGAL')
-        """
-        try:
-            if not self._hb or not self._connected:
-                raise Exception("No hay conexión activa a HomeBroker")
-            
-            logger.info(f"Obteniendo histórico intraday para {symbol}")
-            
-            # Calcular fechas para get_intraday_history (día actual)
-            # Usar datetime.now() directamente, no importar de nuevo
-            to_date = datetime.now()
-            from_date = to_date.replace(hour=0, minute=0, second=0, microsecond=0)  # Inicio del día
-            
-            # Verificar tipos antes de hacer operaciones
-            if not isinstance(to_date, datetime) or not isinstance(from_date, datetime):
-                raise Exception(f"Tipos de fecha incorrectos: to_date={type(to_date)}, from_date={type(from_date)}")
-            
-            # CONVERTIR A DATE para evitar el error de pyhomebroker
-            from_date_date = from_date.date()
-            to_date_date = to_date.date()
-            
-            logger.info(f"Fechas intraday: desde {from_date_date.strftime('%Y-%m-%d %H:%M:%S')} hasta {to_date_date.strftime('%Y-%m-%d %H:%M:%S')}")
-            
-            # Usar el método correcto que existe en pyhomebroker
-            # get_intraday_history requiere: symbol, from_date, to_date
-            # PASAR FECHAS COMO DATE, NO COMO DATETIME
-            df = self._hb.history.get_intraday_history(symbol, from_date_date, to_date_date)
-            
-            if df is not None and not df.empty:
-                # Limpiar y formatear datos
-                df = df.reset_index()
-                
-                # Asegurar que datetime existe y es válido
-                if 'datetime' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['datetime'])
-                    df = df.sort_values('datetime')
-                elif 'date' in df.columns:
-                    df['datetime'] = pd.to_datetime(df['date'])
-                    df = df.sort_values('datetime')
-                
-                # Convertir porcentajes si existen
-                if 'change' in df.columns:
-                    df['change'] = df['change'] / 100
-                
-                logger.info(f"✅ Intraday procesado exitosamente para {symbol}: {len(df)} registros")
-                return df
-            else:
-                logger.warning(f"No se encontraron datos intraday para {symbol}")
-                return pd.DataFrame()
-                
-        except Exception as e:
-            logger.error(f"Error obteniendo histórico intraday para {symbol}: {e}")
-            raise Exception(f"Error obteniendo histórico intraday: {str(e)}")
-
-    def get_intraday_history_batch(self, symbols: List[str]) -> Dict[str, pd.DataFrame]:
-        """
-        Obtiene datos históricos intraday de múltiples símbolos en lote.
-        
-        Args:
-            symbols: Lista de símbolos
-        """
-        results = {}
-        
-        for symbol in symbols:
-            try:
-                df = self.get_intraday_history(symbol)
-                if not df.empty:
-                    results[symbol] = df
-            except Exception as e:
-                logger.error(f"Error obteniendo histórico intraday para {symbol}: {e}")
-                results[symbol] = pd.DataFrame()  # DataFrame vacío en caso de error
-        
-        return results
 
     def is_connected(self) -> bool:
         """Verifica si la conexión está activa y recibiendo datos"""

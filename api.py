@@ -1,7 +1,6 @@
 import os
 from fastapi import FastAPI, HTTPException, Query, Depends, Header, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import List, Optional
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -37,23 +36,10 @@ app.add_middleware(
 )
 
 # Configuración de seguridad - API PÚBLICA
-# Para habilitar autenticación, descomenta las siguientes líneas:
-# security = HTTPBearer()
-# API_TOKEN = os.getenv("API_TOKEN", "default-secure-token-12345")
-
 # Logging para debug
 import logging
 logger = logging.getLogger(__name__)
 logger.info("API configurada en modo PÚBLICO - sin autenticación requerida")
-
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Verifica que el token de autorización sea válido.
-    DESHABILITADO: Esta API es completamente pública.
-    """
-    # API pública - no se requiere autenticación
-    return "public-access"
 
 
 @app.get("/")
@@ -74,10 +60,6 @@ def root():
             "securities": "/securities",
             "securities_by_ticker": "/securities/ticker/{ticker}",
             "securities_all": "/securities/all",
-            "historical": "/historical/{symbol}",
-            "historical_batch": "/historical/batch",
-            "intraday": "/intraday/{symbol}",
-            "intraday_batch": "/intraday/batch",
             "cauciones": "/cauciones",
             "config": "/config",
             "docs": "/docs"
@@ -321,191 +303,6 @@ def get_connection_status():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo estado de conexión: {str(e)}")
-
-
-@app.get("/test/simple-dates")
-def test_simple_dates():
-    """
-    Endpoint de prueba simple para verificar fechas básicas.
-    """
-    try:
-        result = hb_service.test_simple_dates()
-        return {
-            "message": "Prueba simple de fechas",
-            "data": result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en prueba simple de fechas: {str(e)}")
-
-
-@app.get("/test/dates")
-def test_date_calculation(
-    days: int = Query(30, description="Número de días para probar", ge=1, le=365)
-):
-    """
-    Endpoint de prueba para verificar el cálculo de fechas.
-    Útil para debugging de problemas de tipos de fecha.
-    """
-    try:
-        result = hb_service.test_date_calculation(days)
-        return {
-            "message": f"Prueba de fechas para {days} días",
-            "data": result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en prueba de fechas: {str(e)}")
-
-
-@app.get("/historical/{symbol}")
-def get_historical_data(
-    symbol: str,
-    days: int = Query(30, description="Número de días hacia atrás", ge=1, le=365),
-    settlement: str = Query("24hs", description="Tipo de liquidación")
-):
-    """
-    Obtiene datos históricos de un símbolo específico.
-    
-    Args:
-        symbol: Símbolo del instrumento (ej: 'GGAL', 'GFG24JAN17.50C')
-        days: Número de días hacia atrás (1-365)
-        settlement: Tipo de liquidación ('24hs', 'SPOT', '48hs', etc.)
-    """
-    try:
-        print(f"🔍 DEBUG: Iniciando endpoint histórico para {symbol}")
-        print(f"🔍 DEBUG: Parámetros: days={days}, settlement={settlement}")
-        
-        # Verificar estado de conexión primero
-        connection_status = hb_service.get_connection_status()
-        print(f"🔍 DEBUG: Estado de conexión: {connection_status}")
-        
-        if not connection_status.get("connected", False):
-            raise HTTPException(
-                status_code=503, 
-                detail="No hay conexión activa a HomeBroker. Verifica el estado en /status/connection"
-            )
-        
-        # Obtener datos históricos
-        print(f"🔍 DEBUG: Llamando a get_historical_data...")
-        df = hb_service.get_historical_data(symbol, days, settlement)
-        print(f"🔍 DEBUG: DataFrame obtenido: {len(df)} registros")
-        
-        if df.empty:
-            return {
-                "message": f"No se encontraron datos históricos para {symbol}",
-                "symbol": symbol,
-                "days": days,
-                "settlement": settlement,
-                "data": []
-            }
-        
-        # Convertir a formato JSON
-        print(f"🔍 DEBUG: Convirtiendo a JSON...")
-        records = dataframe_to_records(df)
-        print(f"🔍 DEBUG: JSON generado: {len(records)} registros")
-        
-        return {
-            "message": f"Histórico obtenido exitosamente para {symbol}",
-            "symbol": symbol,
-            "days": days,
-            "settlement": settlement,
-            "total_records": len(records),
-            "data": records
-        }
-        
-    except HTTPException:
-        # Re-lanzar HTTPExceptions sin modificar
-        raise
-    except Exception as e:
-        print(f"❌ ERROR en endpoint histórico: {e}")
-        print(f"❌ Tipo de error: {type(e)}")
-        import traceback
-        print(f"❌ Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error obteniendo histórico para {symbol}: {str(e)}")
-
-
-@app.post("/historical/batch")
-def get_historical_data_batch(
-    request: BatchRequest,
-    days: int = Query(30, description="Número de días hacia atrás", ge=1, le=365),
-    settlement: str = Query("24hs", description="Tipo de liquidación (24hs, SPOT, 48hs, etc.)")
-):
-    """
-    Obtiene datos históricos de múltiples símbolos en lote.
-    
-    Args:
-        request: Body con lista de símbolos
-        days: Número de días hacia atrás (1-365)
-        settlement: Tipo de liquidación para securities
-    """
-    try:
-        results = hb_service.get_historical_data_batch(request.symbols, days, settlement)
-        
-        # Convertir DataFrames a records
-        formatted_results = {}
-        for symbol, df in results.items():
-            if not df.empty:
-                formatted_results[symbol] = dataframe_to_records(df)
-            else:
-                formatted_results[symbol] = []
-        
-        return {
-            "message": f"Históricos obtenidos para {len(request.symbols)} símbolos",
-            "data": formatted_results
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error obteniendo históricos en lote: {str(e)}")
-
-
-@app.get("/intraday/{symbol}")
-def get_intraday_data(
-    symbol: str
-):
-    """
-    Obtiene datos históricos intraday (del día actual) de un símbolo específico.
-    
-    Args:
-        symbol: Símbolo del instrumento (ej: 'GGAL', 'GFG24JAN17.50C')
-        
-    Nota: Este endpoint retorna datos del día actual en tiempo real/intraday.
-    """
-    try:
-        df = hb_service.get_intraday_history(symbol)
-        if df.empty:
-            return {"message": f"No se encontraron datos intraday para {symbol}", "data": []}
-        return dataframe_to_records(df)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error obteniendo histórico intraday para {symbol}: {str(e)}")
-
-
-@app.post("/intraday/batch")
-def get_intraday_data_batch(
-    request: BatchRequest
-):
-    """
-    Obtiene datos históricos intraday de múltiples símbolos en lote.
-    
-    Args:
-        request: Body con lista de símbolos
-        
-    Nota: Este endpoint retorna datos del día actual en tiempo real/intraday.
-    """
-    try:
-        results = hb_service.get_intraday_history_batch(request.symbols)
-        
-        # Convertir DataFrames a records
-        formatted_results = {}
-        for symbol, df in results.items():
-            if not df.empty:
-                formatted_results[symbol] = dataframe_to_records(df)
-            else:
-                formatted_results[symbol] = []
-        
-        return {
-            "message": f"Históricos intraday obtenidos para {len(request.symbols)} símbolos",
-            "data": formatted_results
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error obteniendo históricos intraday en lote: {str(e)}")
 
 
 @app.get("/config")
