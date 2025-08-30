@@ -161,7 +161,7 @@ curl "https://tu-api.onrender.com/health"
 
 ```bash
 # Credenciales de HomeBroker (OBLIGATORIAS)
-HB_BROKER=0                    # ID del broker (0 = IOL)
+HB_BROKER=0                    # ID del broker
 HB_DNI=tu_dni_aqui            # Tu DNI
 HB_USER=tu_usuario_aqui       # Tu usuario
 HB_PASSWORD=tu_password_aqui  # Tu contraseña
